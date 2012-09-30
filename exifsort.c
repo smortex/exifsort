@@ -28,8 +28,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <libexif/exif-data.h>
+
+int reverse_sort;
 
 struct photo {
     char *filename;
@@ -42,7 +45,13 @@ compare_datetime (const void *r_left, const void *r_right)
     struct photo *left = (struct photo *) r_left;
     struct photo *right = (struct photo *) r_right;
 
-    return difftime (left->datetime, right->datetime);
+    return difftime (left->datetime, right->datetime) * (reverse_sort ? -1 : 1);
+}
+
+void
+usage (void)
+{
+    fprintf (stderr, "usage: exifsort [-r] file...\n");
 }
 
 int
@@ -53,15 +62,29 @@ main (int argc, char *argv[])
 
     struct photo *photos;
 
-    int n_photos = argc - 1;
+    char ch;
+    while ((ch = getopt (argc, argv, "r")) != -1) {
+	switch (ch) {
+	case 'r':
+	    reverse_sort = 1;
+	    break;
+	case '?':
+	default:
+	    usage ();
+	    exit (EXIT_FAILURE);
+	}
+    }
 
-    if (!(photos = malloc (n_photos * sizeof (*photos)))) {
+    argc -= optind;
+    argv += optind;
+
+    if (!(photos = malloc (argc * sizeof (*photos)))) {
 	err (EXIT_FAILURE, "malloc");
     }
 
-    for (int i = 1; i < argc; i++) {
-	photos[i-1].filename = argv[i];
-	photos[i-1].datetime = 0;
+    for (int i = 0; i < argc; i++) {
+	photos[i].filename = argv[i];
+	photos[i].datetime = 0;
 
 	if (!(ed = exif_data_new_from_file (argv[i]))) {
 	    warn ("%s: can't read EXIF data", argv[i]);
@@ -80,14 +103,14 @@ main (int argc, char *argv[])
 	 * My camera store the local time with no way to set the timezone.
 	 * I should setup it UTC.
 	 */
-	photos[i-1].datetime = mktime (&time);
+	photos[i].datetime = mktime (&time);
 
 	exif_data_unref (ed);
     }
 
-    qsort (photos, n_photos, sizeof (*photos), compare_datetime);
+    qsort (photos, argc, sizeof (*photos), compare_datetime);
 
-    for (int i = 0; i < n_photos; i++) {
+    for (int i = 0; i < argc; i++) {
 	printf ("%s\n", photos[i].filename);
     }
 
