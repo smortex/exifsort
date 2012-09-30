@@ -27,6 +27,7 @@
 #include <err.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -82,28 +83,33 @@ main (int argc, char *argv[])
 	err (EXIT_FAILURE, "malloc");
     }
 
+    time_t epoch = 0;
+    struct tm *time = gmtime (&epoch);
+
     for (int i = 0; i < argc; i++) {
 	photos[i].filename = argv[i];
 	photos[i].datetime = 0;
 
 	if (!(ed = exif_data_new_from_file (argv[i]))) {
-	    warn ("%s: can't read EXIF data", argv[i]);
+	    warnx ("%s: can't read EXIF data", argv[i]);
 	    continue;
 	}
 
-	entry = exif_content_get_entry (ed->ifd[EXIF_IFD_0], EXIF_TAG_DATE_TIME);
+	entry = exif_content_get_entry (ed->ifd[EXIF_IFD_EXIF], EXIF_TAG_DATE_TIME_ORIGINAL);
 
 	char buf[BUFSIZ];
 	exif_entry_get_value (entry, buf, sizeof (buf));
 
-	struct tm time;
-	strptime (buf, "%Y:%m:%d %H:%M:%S", &time);
+	time = gmtime (&epoch);
+	if (!strptime (buf, "%Y:%m:%d %H:%M:%S", time)) {
+	    time = gmtime (&epoch);
+	}
 	/*
 	 * XXX Can we get the timezone settings from the EXIF info?
 	 * My camera store the local time with no way to set the timezone.
 	 * I should setup it UTC.
 	 */
-	photos[i].datetime = mktime (&time);
+	photos[i].datetime = mktime (time);
 
 	exif_data_unref (ed);
     }
