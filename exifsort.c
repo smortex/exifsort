@@ -85,7 +85,9 @@ main (int argc, char *argv[])
     }
 
     time_t epoch = 0;
-    struct tm *time = gmtime (&epoch);
+    struct tm time;
+
+    gmtime_r (&epoch, &time);
 
     for (int i = 0; i < argc; i++) {
 	photos[i].filename = argv[i];
@@ -101,16 +103,16 @@ main (int argc, char *argv[])
 	char buf[BUFSIZ];
 	exif_entry_get_value (entry, buf, sizeof (buf));
 
-	time = gmtime (&epoch);
-	if (!strptime (buf, "%Y:%m:%d %H:%M:%S", time)) {
-	    time = gmtime (&epoch);
+	gmtime_r (&epoch, &time);
+	if (!strptime (buf, "%Y:%m:%d %H:%M:%S", &time)) {
+	    gmtime_r (&epoch, &time);
 	}
 	/*
 	 * XXX Can we get the timezone settings from the EXIF info?
 	 * My camera store the local time with no way to set the timezone.
 	 * I should setup it UTC.
 	 */
-	photos[i].datetime = mktime (time);
+	photos[i].datetime = mktime (&time);
 
 	exif_data_unref (ed);
     }
